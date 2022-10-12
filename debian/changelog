@@ -1,3 +1,85 @@
+pygeometa (0.13.1) bionic; urgency=medium
+
+  * fix pygeoapi media type and payload for raw responses
+  * fix STAC and DCAT write() function signatures
+
+ -- Tom Kralidis <tomkralidis@gmail.com>  Fri, 30 Sep 2022 14:25:58 +0000
+
+pygeometa (0.13.0) bionic; urgency=medium
+
+  * add environment variable support for MCFs
+  * add pygeoapi plugin
+
+ -- Tom Kralidis <tomkralidis@gmail.com>  Thu, 29 Sep 2022 14:38:35 +0000
+
+pygeometa (0.12.0) bionic; urgency=medium
+
+  * fix OARec temporal extent date casting
+  * update OARec output to latest version of draft specification
+  * add support for WMO Core Metadata Profile 2 (WCMP2)
+  * fix ISO contact handling
+  * add temporal resolution support
+  * fix DCAT reference error
+
+ -- Tom Kralidis <tomkralidis@gmail.com>  Sun, 28 Aug 2022 11:56:28 +0000
+
+pygeometa (0.11.1) bionic; urgency=medium
+
+  * fix ISO gmd:function handling
+  * fix OARec generation based on latest specification updates
+
+ -- Tom Kralidis <tomkralidis@gmail.com>  Thu, 16 Jun 2022 13:56:28 +0000
+
+pygeometa (0.11.0) bionic; urgency=medium
+
+  * add link relation support to MCF model
+
+ -- Tom Kralidis <tomkralidis@gmail.com>  Tue, 7 Jun 2022 22:44:10 +0000
+
+pygeometa (0.10.0) bionic; urgency=medium
+
+  * add ISO importer
+  * add support for MCF attributes
+  * dump import as YAML to CLI
+  * add identification.edition to MCF model
+
+ -- Tom Kralidis <tomkralidis@gmail.com>  Sat, 28 May 2022 10:15:25 +0000
+
+pygeometa (0.9.1) bionic; urgency=medium
+
+  * fix OARec associations
+
+ -- Tom Kralidis <tomkralidis@gmail.com>  Tue, 1 Mar 2022 1:14:35 +0000
+
+pygeometa (0.9.0) bionic; urgency=medium
+
+  * OARec model updates
+  * fix schema write stringify support
+  * fix keyword vocabulary ref
+  * fix validation of nested MCFs
+  * add WMO thesaurus to ISO-based keywords
+  * align contact keys to ISO/STAC roles
+
+ -- Tom Kralidis <tomkralidis@gmail.com>  Sun, 6 Feb 2022 21:18:53 +0000
+
+pygeometa (0.8.0) bionic; urgency=medium
+
+  * update multilingual support
+  * add MCF schema support
+
+ -- Tom Kralidis <tomkralidis@gmail.com>  Sat, 11 Sep 2021 11:52:18 +0000
+
+pygeometa (0.7.0) bionic; urgency=medium
+
+  * support keyword vocabulary
+  * fix ISO unique IDs
+  * add support for OGC API - Records metadata model
+  * add support for ISO gmd:dataQualityInfo
+  * WCMP: update templates to align with WMO KPIs
+  * fall gracefully on null dates
+
+ -- Tom Kralidis <tomkralidis@gmail.com>  Fri, 3 Sep 2021 13:01:35 +0000
+
 pygeometa (0.6.0) bionic; urgency=medium
 
   * numerous new WIGOS elements and fixes

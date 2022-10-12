@@ -43,15 +43,21 @@
 #
 # =================================================================
 
+import json
+import logging
 import os
+from typing import Union
 
-from pygeometa.schemas.base import BaseOutputSchema
+from pygeometa.helpers import json_serial
+from pygeometa.schemas.ogcapi_records import OGCAPIRecordOutputSchema
 
 THISDIR = os.path.dirname(os.path.realpath(__file__))
 
+LOGGER = logging.getLogger(__name__)
 
-class SampleOutputSchema(BaseOutputSchema):
-    """Sample output schema"""
+
+class WMOWCMP2OutputSchema(OGCAPIRecordOutputSchema):
+    """OGC API - Records - Part 1: Core record schema"""
 
     def __init__(self):
         """
@@ -60,11 +66,37 @@ class SampleOutputSchema(BaseOutputSchema):
         :returns: pygeometa.schemas.base.BaseOutputSchema
         """
 
-        super().__init__('sample', 'json', THISDIR)
+        super().__init__()
 
-    def write(self, mcf: dict) -> str:
+    def write(self, mcf: dict, stringify: str = True) -> Union[dict, str]:
         """
-        Write MCF into sample schema output
+        Write outputschema to JSON string buffer
+
+        :param mcf: dict of MCF content model
+        :param stringify: whether to return a string representation (default)
+                          else native (dict, etree)
+
+
+        :returns: `dict` or `str` of MCF as an OARec record representation
         """
 
-        return f"MCF_FILE_VERSION: {mcf['mcf']['version']}"
+        record = super().write(mcf, stringify=False)
+
+        LOGGER.debug('Setting WCMP2 conformance')
+        record['conformsTo'] = ['http://wis.wmo.int/spec/wcmp/2.0']
+
+        if 'edition' in mcf['identification']:
+            record['properties']['version'] = mcf['identification']['version']
+
+        LOGGER.debug('Setting WCMP2 distribution links')
+        record['links'] = []
+        for key, value in mcf['distribution'].items():
+            link = self.generate_link(value)
+            if 'wmo_topic' in value:
+                link['wmo:topic'] = value['wmo_topic']
+            record['links'].append(link)
+
+        if stringify:
+            return json.dumps(record, default=json_serial, indent=4)
+        else:
+            return record

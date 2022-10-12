@@ -19,7 +19,7 @@
 # referenced with those assets.
 #
 # Copyright (c) 2016 Government of Canada
-# Copyright (c) 2020 Tom Kralidis
+# Copyright (c) 2022 Tom Kralidis
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -44,72 +44,55 @@
 #
 # =================================================================
 
-import collections
+from collections.abc import Mapping
 from datetime import date, datetime
 import io
+import json
 import logging
 import os
 import pkg_resources
 import re
-from typing import Union
+from typing import IO, Union
 from xml.dom import minidom
 
 import click
 from jinja2 import Environment, FileSystemLoader
 from jinja2.exceptions import TemplateNotFound
+from jsonschema import validate as jsonschema_validate
+from jsonschema.exceptions import ValidationError
 import yaml
 
 from pygeometa import cli_options
+from pygeometa.helpers import json_serial
 from pygeometa.schemas import get_supported_schemas, load_schema
 
 LOGGER = logging.getLogger(__name__)
 
-SCHEMAS = '{}{}schemas'.format(os.path.dirname(os.path.realpath(__file__)),
-                               os.sep)
+SCHEMAS = f'{os.path.dirname(os.path.realpath(__file__))}{os.sep}schemas'
 
 VERSION = pkg_resources.require('pygeometa')[0].version
 
 
-def get_charstring(option: str, section_items: list, language: str,
+def get_charstring(option: Union[str, dict], language: str,
                    language_alternate: str = None) -> list:
     """
     convenience function to return unilingual or multilingual value(s)
 
-    :param option: charstring option
-    :param section_items: option items in section
+    :param option: option value (str or dict if multilingual)
     :param language: language
     :param language_alternate: alternate language
 
     :returns: list of unilingual or multilingual values
     """
 
-    section_items = dict(section_items)
-    option_value1 = None
-    option_value2 = None
-
-    if language_alternate is None:  # noqa unilingual
-        option_tmp = '{}_{}'.format(option, language)
-        if option_tmp in section_items:
-            option_value1 = section_items[option_tmp]
-        else:
-            try:
-                option_value1 = section_items[option]
-            except KeyError:
-                pass  # default=None
+    if option is None:
+        return [None, None]
+    elif isinstance(option, str):  # unilingual
+        return [option, None]
+    elif isinstance(option, list):  # multilingual list
+        return [option, None]
     else:  # multilingual
-        option_tmp = '{}_{}'.format(option, language)
-        if option_tmp in section_items:
-            option_value1 = section_items[option_tmp]
-        else:
-            try:
-                option_value1 = section_items[option]
-            except KeyError:
-                pass  # default=None
-        option_tmp2 = '{}_{}'.format(option, language_alternate)
-        if option_tmp2 in section_items:
-            option_value2 = section_items[option_tmp2]
-
-    return [option_value1, option_value2]
+        return [option.get(language), option.get(language_alternate)]
 
 
 def get_distribution_language(section: str) -> str:
@@ -169,14 +152,14 @@ def normalize_datestring(datestring: str, format_: str = 'default') -> str:
                 return mo.group('year')
             else:  # default
                 mo = re.match(re2, datestring)
-                return '{}T{}'.format(mo.group('date'), mo.group('time'))
+                return f"{mo.group('date')}T{mo.group('time')}"
         elif '$Date' in datestring:  # svn Date keyword embedded
             if format_ == 'year':
                 mo = re.match(re3, datestring)
-                return '{}{}{}'.format(mo.group('start'),
-                                       mo.group('year'), mo.group('end'))
-    except AttributeError:
-        raise RuntimeError('Invalid datestring: {}'.format(datestring))
+                return f"{mo.group('start')}{mo.group('year')}{mo.group('end')}"  # noqa
+    except (AttributeError, TypeError):
+        raise RuntimeError(f'Invalid datestring: {datestring}')
+
     return datestring
 
 
@@ -256,16 +239,17 @@ def read_mcf(mcf: Union[dict, str]) -> dict:
         try:
             if isinstance(mcf_object, dict):
                 LOGGER.debug('mcf object is already a dict')
+                LOGGER.debug('Environment variables will NOT be interpreted')
                 dict_ = mcf_object
             elif 'metadata:' in mcf_object:
                 LOGGER.debug('mcf object is a string')
-                dict_ = yaml.load(mcf_object, Loader=yaml.FullLoader)
+                dict_ = yaml_load(mcf_object)
             else:
                 LOGGER.debug('mcf object is likely a filepath')
                 with io.open(mcf_object, encoding='utf-8') as fh:
-                    dict_ = yaml.load(fh, Loader=yaml.FullLoader)
+                    dict_ = yaml_load(fh)
         except yaml.scanner.ScannerError as err:
-            msg = 'YAML parsing error: {}'.format(err)
+            msg = f'YAML parsing error: {err}'
             LOGGER.debug(msg)
             raise MCFReadError(msg)
 
@@ -286,7 +270,7 @@ def read_mcf(mcf: Union[dict, str]) -> dict:
         """
         for k, v in merge_dct.items():
             if (k in dct and isinstance(dct[k], dict)
-                    and isinstance(merge_dct[k], collections.Mapping)):
+                    and isinstance(merge_dct[k], Mapping)):
                 __dict_merge(dct[k], merge_dct[k])
             else:
                 if k in dct and k in merge_dct:
@@ -310,18 +294,18 @@ def read_mcf(mcf: Union[dict, str]) -> dict:
                     dict2.pop(k, None)
         return dict2
 
-    LOGGER.debug('reading {}'.format(mcf))
+    LOGGER.debug(f'reading {mcf}')
     mcf_dict = __to_dict(mcf)
 
     LOGGER.debug('recursively parsing dict')
 
     mcf_dict = __parse_mcf_dict_recursive(mcf_dict)
 
-    LOGGER.debug('Fully parsed MCF: {}'.format(mcf_dict))
+    LOGGER.debug(f'Fully parsed MCF: {mcf_dict}')
 
     try:
         mcf_version = str(mcf_dict['mcf']['version'])
-        LOGGER.info('MCF version: {}'.format(mcf_version))
+        LOGGER.info(f'MCF version: {mcf_version}')
     except KeyError:
         msg = 'no MCF version specified'
         LOGGER.error(msg)
@@ -329,7 +313,7 @@ def read_mcf(mcf: Union[dict, str]) -> dict:
 
     for mcf_version_ in mcf_versions:
         if not mcf_version_.startswith(mcf_version):
-            msg = 'invalid / unsupported version {}'.format(mcf_version)
+            msg = f'invalid / unsupported version {mcf_version}'
             LOGGER.error(msg)
             raise MCFReadError(msg)
 
@@ -367,7 +351,7 @@ def render_j2_template(mcf: dict, template_dir: str = None) -> str:
         LOGGER.error(msg)
         raise RuntimeError(msg)
 
-    LOGGER.debug('Setting up template environment {}'.format(template_dir))
+    LOGGER.debug(f'Setting up template environment {template_dir}')
     env = Environment(loader=FileSystemLoader([template_dir, SCHEMAS]))
 
     LOGGER.debug('Adding template filters')
@@ -396,6 +380,28 @@ def render_j2_template(mcf: dict, template_dir: str = None) -> str:
     return pretty_print(xml)
 
 
+def validate_mcf(instance_dict: dict) -> bool:
+    """
+    Validate an MCF document against the MCF schema
+
+    :param instance_dict: dict of MCF instance
+
+    :returns: `bool` of validation
+    """
+
+    schema_file = os.path.join(SCHEMAS, 'mcf', 'core.yaml')
+
+    with open(schema_file) as fh2:
+        schema_dict = yaml_load(fh2)
+
+        try:
+            jsonschema_validate(instance_dict, schema_dict)
+        except ValidationError as err:
+            raise MCFValidationError(err)
+
+        return True
+
+
 def get_abspath(mcf, filepath):
     """helper function absolute file access"""
 
@@ -403,16 +409,94 @@ def get_abspath(mcf, filepath):
     return os.path.join(abspath, filepath)
 
 
+def get_typed_value(value) -> Union[float, int, str]:
+    """
+    Derive true type from data value
+    :param value: value
+    :returns: value as a native Python data type
+    """
+
+    try:
+        if '.' in value:  # float?
+            value2 = float(value)
+        elif len(value) > 1 and value.startswith('0'):
+            value2 = value
+        else:  # int?
+            value2 = int(value)
+    except ValueError:  # string (default)?
+        value2 = value
+
+    return value2
+
+
+def yaml_load(obj: Union[IO, str]) -> dict:
+    """
+    serializes a YAML files into a pyyaml object
+
+    :param obj: file handle or string
+
+    :returns: `dict` representation of YAML
+    """
+
+    # support environment variables in config
+    # https://stackoverflow.com/a/55301129
+    path_matcher = re.compile(r'.*\$\{([^}^{]+)\}.*')
+
+    def path_constructor(loader, node):
+        env_var = path_matcher.match(node.value).group(1)
+        if env_var not in os.environ:
+            msg = f'Undefined environment variable {env_var} in config'
+            raise EnvironmentError(msg)
+        return get_typed_value(os.path.expandvars(node.value))
+
+    class EnvVarLoader(yaml.SafeLoader):
+        pass
+
+    EnvVarLoader.add_implicit_resolver('!path', path_matcher, None)
+    EnvVarLoader.add_constructor('!path', path_constructor)
+
+    return yaml.load(obj, Loader=EnvVarLoader)
+
+
 class MCFReadError(Exception):
     """Exception stub for format reading errors"""
     pass
 
 
-@click.command()
+class MCFValidationError(Exception):
+    """Exception stub for validation errors"""
+    pass
+
+
+@click.command('import')
 @click.pass_context
-@cli_options.OPTION_MCF
+@cli_options.ARGUMENT_METADATA_FILE
 @cli_options.OPTION_OUTPUT
 @cli_options.OPTION_VERBOSITY
+@click.option('--schema', required=True,
+              type=click.Choice(get_supported_schemas()),
+              help='Metadata schema')
+def import_(ctx, metadata_file, schema, output, verbosity):
+    """import metadata"""
+
+    LOGGER.info(f'Importing {metadata_file} into {schema}')
+    schema_object = load_schema(schema)
+
+    try:
+        content = schema_object.import_(metadata_file.read())
+    except NotImplementedError:
+        raise click.ClickException(f'Import not supported for {schema}')
+
+    if output is None:
+        click.echo(yaml.dump(content))
+    else:
+        output.write(yaml.dump(content, indent=4))
+
+
+@click.command()
+@click.pass_context
+@cli_options.ARGUMENT_MCF
+@cli_options.OPTION_OUTPUT
 @click.option('--schema',
               type=click.Choice(get_supported_schemas()),
               help='Metadata schema')
@@ -421,13 +505,10 @@ class MCFReadError(Exception):
                               dir_okay=True, file_okay=False),
               help='Locally defined metadata schema')
 @cli_options.OPTION_VERBOSITY
-def generate_metadata(ctx, mcf, schema, schema_local, output, verbosity):
+def generate(ctx, mcf, schema, schema_local, output, verbosity):
     """generate metadata"""
 
-    if verbosity is not None:
-        logging.basicConfig(level=getattr(logging, verbosity))
-
-    if mcf is None or all([schema is None, schema_local is None]):
+    if schema is None and schema_local is None:
         raise click.UsageError('Missing arguments')
     elif None not in [schema, schema_local]:
         raise click.UsageError('schema / schema_local are mutually exclusive')
@@ -435,7 +516,7 @@ def generate_metadata(ctx, mcf, schema, schema_local, output, verbosity):
     mcf_dict = read_mcf(mcf)
 
     if schema is not None:
-        LOGGER.info('Processing {} into {}'.format(mcf, schema))
+        LOGGER.info(f'Processing {mcf} into {schema}')
         schema_object = load_schema(schema)
         content = schema_object.write(mcf_dict)
     else:
@@ -449,33 +530,75 @@ def generate_metadata(ctx, mcf, schema, schema_local, output, verbosity):
 
 @click.command()
 @click.pass_context
-@cli_options.OPTION_MCF
+@cli_options.ARGUMENT_MCF
 @cli_options.OPTION_VERBOSITY
 def info(ctx, mcf, verbosity):
     """provide information about an MCF"""
 
-    if verbosity is not None:
-        logging.basicConfig(level=getattr(logging, verbosity))
+    LOGGER.info(f'Processing {mcf}')
+    try:
+        content = read_mcf(mcf)
 
-    if mcf is None:
-        raise click.UsageError('Missing arguments')
-    else:
-        LOGGER.info('Processing {}'.format(mcf))
-        try:
-            content = read_mcf(mcf)
-
-            click.echo('MCF overview')
-            click.echo('  version: {}'.format(content['mcf']['version']))
-            click.echo('  identifier: {}'.format(
-                content['metadata']['identifier']))
-            click.echo('  language: {}'.format(
-                       content['metadata']['language']))
-        except Exception as err:
-            raise click.ClickException(err)
+        click.echo('MCF overview')
+        click.echo(f"  version: {content['mcf']['version']}")
+        click.echo(f"  identifier: {content['metadata']['identifier']}")
+        click.echo(f"  language: {content['metadata']['language']}")
+    except Exception as err:
+        raise click.ClickException(err)
 
 
 @click.command()
 @click.pass_context
-def schemas(ctx):
+@cli_options.OPTION_VERBOSITY
+def schemas(ctx, verbosity):
     """list supported schemas"""
     click.echo('\n'.join(get_supported_schemas()))
+
+
+@click.command()
+@click.pass_context
+@cli_options.ARGUMENT_MCF
+@cli_options.OPTION_VERBOSITY
+def validate(ctx, mcf, verbosity):
+    """validate MCF Document"""
+
+    click.echo(f'Validating {mcf}')
+
+    instance = json.loads(json.dumps(read_mcf(mcf), default=json_serial))
+    validate_mcf(instance)
+
+    click.echo('Valid MCF document')
+
+
+@click.command()
+@click.pass_context
+@cli_options.ARGUMENT_METADATA_FILE
+@cli_options.OPTION_OUTPUT
+@cli_options.OPTION_VERBOSITY
+@click.option('--input-schema', required=True,
+              type=click.Choice(get_supported_schemas()),
+              help='Metadata schema of input file')
+@click.option('--output-schema', required=True,
+              type=click.Choice(get_supported_schemas()),
+              help='Metadata schema of input file')
+def transform(ctx, metadata_file, input_schema, output_schema, output,
+              verbosity):
+    """transform metadata"""
+
+    LOGGER.info(f'Importing {metadata_file} into {input_schema}')
+    schema_object_input = load_schema(input_schema)
+    content = None
+
+    try:
+        content = schema_object_input.import_(metadata_file.read())
+    except NotImplementedError:
+        raise click.ClickException(f'Import not supported for {input_schema}')
+
+    LOGGER.info(f'Processing into {output_schema}')
+    schema_object_output = load_schema(output_schema)
+    content = schema_object_output.write(content)
+
+    if output is None:
+        click.echo(content)
+    else:
+        output.write(content)

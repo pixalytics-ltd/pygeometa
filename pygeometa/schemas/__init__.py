@@ -18,7 +18,7 @@
 # those files. Users are asked to read the 3rd Party Licenses
 # referenced with those assets.
 #
-# Copyright (c) 2020 Tom Kralidis
+# Copyright (c) 2022 Tom Kralidis
 #
 # Permission is hereby granted, free of charge, to any person
 # obtaining a copy of this software and associated documentation
@@ -56,11 +56,12 @@ SCHEMAS = {
     'iso19139': 'pygeometa.schemas.iso19139.ISO19139OutputSchema',
     'iso19139-2': 'pygeometa.schemas.iso19139_2.ISO19139_2OutputSchema',
     'iso19139-hnap': 'pygeometa.schemas.iso19139_hnap.ISO19139HNAPOutputSchema',  # noqa
-    'oarec-record': 'pygeometa.schemas.ogc_api_records.OGCAPIRecordOutputSchema',  # noqa
-    'oarec-drecord': 'pygeometa.schemas.ogc_api_dataset_records.OGCAPIDRecordOutputSchema',  # noqa
-    'stac-item': 'pygeometa.schemas.stac.STACItemOutputSchema',
+    'oarec-record': 'pygeometa.schemas.ogcapi_records.OGCAPIRecordOutputSchema',  # noqa
+    'oarec-drecord': 'pygeometa.schemas.ogcapi_dataset_records.OGCAPIDRecordOutputSchema',  # noqa
+'stac-item': 'pygeometa.schemas.stac.STACItemOutputSchema',
     'dcat': 'pygeometa.schemas.dcat.DCATOutputSchema',
     'wmo-cmp': 'pygeometa.schemas.wmo_cmp.WMOCMPOutputSchema',
+    'wmo-wcmp2': 'pygeometa.schemas.wmo_wcmp2.WMOWCMP2OutputSchema',
     'wmo-wigos': 'pygeometa.schemas.wmo_wigos.WMOWIGOSOutputSchema'
 }
 
@@ -78,7 +79,7 @@ def get_supported_schemas() -> list:
 
     dirs = os.listdir(THISDIR)
 
-    LOGGER.debug('directory listing: {}'.format(dirs))
+    LOGGER.debug(f'directory listing: {dirs}')
 
     dirs.remove('common')
     dirs.remove('__init__.py')
@@ -89,7 +90,7 @@ def get_supported_schemas() -> list:
     except ValueError:
         pass
 
-    LOGGER.debug('schemas: {}'.format(dirs))
+    LOGGER.debug(f'schemas: {dirs}')
 
     return dirs
 
@@ -103,10 +104,10 @@ def load_schema(schema_name: str) -> BaseOutputSchema:
     :returns: plugin object
     """
 
-    LOGGER.debug('Schemas: {}'.format(SCHEMAS.keys()))
+    LOGGER.debug(f'Schemas: {SCHEMAS.keys()}')
 
     if schema_name not in SCHEMAS.keys():
-        msg = 'Schema {} not found'.format(schema_name)
+        msg = f'Schema {schema_name} not found'
         LOGGER.exception(msg)
         raise InvalidSchemaError(msg)
 
@@ -115,10 +116,10 @@ def load_schema(schema_name: str) -> BaseOutputSchema:
     if '.' in name:  # dotted path
         packagename, classname = name.rsplit('.', 1)
     else:
-        raise InvalidSchemaError('Schema path {} not found'.format(name))
+        raise InvalidSchemaError(f'Schema path {name} not found')
 
-    LOGGER.debug('package name: {}'.format(packagename))
-    LOGGER.debug('class name: {}'.format(classname))
+    LOGGER.debug(f'package name: {packagename}')
+    LOGGER.debug(f'class name: {classname}')
 
     module = importlib.import_module(packagename)
     class_ = getattr(module, classname)

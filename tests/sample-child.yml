@@ -2,13 +2,12 @@ mcf:
     version: 1.0
 
 metadata:
-    identifier: 3f342f64-9348-11df-ba6a-0014c2c00eab
+    base_mcf: base-metadata.yml
     language: en
     language_alternate: fr
     charset: utf8
     parentidentifier: someparentid
     hierarchylevel: dataset
-    datestamp: 2014-11-11
     dataseturi: http://some/minted/uri
 
 spatial:
@@ -24,7 +23,6 @@ identification:
     abstract:
         en: abstract in English
         fr: abstract in French
-    edition: 1.8.0
     dates:
         creation: 2011-11-11
         publication: 2000-09-01T00:00:00Z
@@ -55,7 +53,6 @@ identification:
         temporal:
             - begin: 1950-07-31
               end: now
-              resolution: P1Y
     fees: None
     accessconstraints: otherRestrictions
     rights:
@@ -69,11 +66,6 @@ content_info:
     type: image
     cloud_cover: 72
     processing_level: "1.0"
-    attributes:
-        - name: foo
-          units: m
-        - name: bar
-          units: K
     dimensions:
         - name: B1
           units: nm
@@ -110,9 +102,8 @@ contact:
 
 distribution:
     waf:
-        url: https://example.org/data
+        url: https://dd.meteo.gc.ca
         type: WWW:LINK
-        rel: canonical
         name: my waf
         description:
             en: description in English
@@ -120,9 +111,8 @@ distribution:
         function: download
 
     wms:
-        url: https://example.org/wms
+        url: https://dd.meteo.gc.ca
         type: OGC:WMS
-        rel: service
         name:
             en: roads
             fr: routes
@@ -136,9 +126,3 @@ dataquality:
         level: dataset
     lineage:
         statement: this dataset was derived from a custom process against dataset xyz
-
-attributes:
-    - name: foo
-      units: m
-    - name: bar
-      units: K
