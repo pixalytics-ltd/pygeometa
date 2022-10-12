@@ -58,6 +58,7 @@ SCHEMAS = {
     'iso19139-hnap': 'pygeometa.schemas.iso19139_hnap.ISO19139HNAPOutputSchema',  # noqa
     'oarec-record': 'pygeometa.schemas.ogcapi_records.OGCAPIRecordOutputSchema',  # noqa
     'oarec-drecord': 'pygeometa.schemas.ogcapi_dataset_records.OGCAPIDRecordOutputSchema',  # noqa
+    't18dml': 'pygeometa.schemas.ogc_t18dml.OGCT18DMLOutputSchema',  # noqa
 'stac-item': 'pygeometa.schemas.stac.STACItemOutputSchema',
     'dcat': 'pygeometa.schemas.dcat.DCATOutputSchema',
     'wmo-cmp': 'pygeometa.schemas.wmo_cmp.WMOCMPOutputSchema',
